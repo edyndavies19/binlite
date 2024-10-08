@@ -191,8 +191,8 @@ class BinaryAlphaDisk:
         v2_sqr = np.minimum((m1 / self.m)**2 * G_cgs * self.m * (2. / r - 1. / a) / c_cgs**2, 1. - floor)
         gam1 = 1. /  np.sqrt(1. - v1_sqr)
         gam2 = 1. /  np.sqrt(1. - v2_sqr)
-        dop1 = 1. / (gam1 * (1. - vr1 / c_cgs))**(3. - self.alphanu)
-        dop2 = 1. / (gam2 * (1. - vr2 / c_cgs))**(3. - self.alphanu)
+        dop1 = 1. / (gam1 * (1. - vr1 / c_cgs))**(3. - self.alphanu) if boosting else np.ones(time.shape) # JUST FOR LOCAL COPY / TESTING
+        dop2 = 1. / (gam2 * (1. - vr2 / c_cgs))**(3. - self.alphanu) if boosting else np.ones(time.shape) # JUST FOR LOCAL COPY / TESTING
         x1 = r1 * (np.cos(omega) * np.cos(self.pomega + true_anomalies) - np.sin(omega) * np.sin(self.pomega + true_anomalies) * cosi)
         y1 = r1 * (np.sin(omega) * np.cos(self.pomega + true_anomalies) + np.cos(omega) * np.sin(self.pomega + true_anomalies) * cosi)
         z1 = r1 * (np.sin(self.pomega + true_anomalies) * sini)
@@ -210,7 +210,7 @@ class BinaryAlphaDisk:
         dr = np.sqrt((x1 - x2)**2 + (y1 - y2)**2)
         re = np.sqrt(4 * G_cgs * ml * dl / c_cgs**2)
         u  = dr / (re + 1e-14)
-        mlens = (u**2 + 2.) / (u * np.sqrt(u**2 + 4.))
+        mlens = (u**2 + 2.) / (u * np.sqrt(u**2 + 4.)) if lensing else np.ones(time.shape) # JUST FOR LOCAL COPY / TESTING
         magnification = (1 - fs) * dop1 + fs * dop2 * mlens
         magnification[flip] = (1 - fs) * dop1[flip] * mlens[flip] + fs * dop2[flip]
         return magnification
@@ -285,7 +285,8 @@ def normalized_flux_series(frequency:float,
                            argument_of_pericenter_deg:float=0.0,
                            spectral_slope_lnln:float=-1.0,
                            geometric_dimming:int=False,
-                           lens_boost=False,
+                           boosting=False,
+                           lensing=False,
                           ):
     """Generate a periodic flux timeseries at given frequency normalized to the total averaged (in the rest frame) flux
 
@@ -351,7 +352,7 @@ def normalized_flux_series(frequency:float,
                           spectral_slope_lnln,
                           geometric_dimming,
                         )
-    return normazlied_flux_series_from_bad(frequency, acc, bad, lens_boost=lens_boost)
+    return normazlied_flux_series_from_bad(frequency, acc, bad, boosting=boosting, lensing=lensing)
 
 def periodic_flux_series(frequency:float, 
                          accretion_series:AccretionSeries, 
@@ -368,7 +369,8 @@ def periodic_flux_series(frequency:float,
                          argument_of_pericenter_deg:float=0.0,
                          spectral_slope_lnln:float=-1.0,
                          geometric_dimming:int=False,
-                         lens_boost=False,
+                         boosting=False,
+                         lensing=False,
                         ):
     """Generate a periodic flux timeseries at given frequency
 
@@ -434,7 +436,7 @@ def periodic_flux_series(frequency:float,
                           spectral_slope_lnln,
                           geometric_dimming,
                         )
-    return bad.fnu_total(frequency) * normazlied_flux_series_from_bad(frequency, acc, bad, lens_boost=lens_boost)
+    return bad.fnu_total(frequency) * normazlied_flux_series_from_bad(frequency, acc, bad, boosting=boosting, lensing=lensing)
 
 # -----------------------------------------------------------------------------
 def time_from_bad(accretion_series:AccretionSeries, bad:BinaryAlphaDisk):
@@ -454,7 +456,7 @@ def time_from_bad(accretion_series:AccretionSeries, bad:BinaryAlphaDisk):
     """
     return time(accretion_series, bad.p / yr2sec)
 
-def normazlied_flux_series_from_bad(frequency:float, accretion_series:AccretionSeries, bad:BinaryAlphaDisk, lens_boost=False):
+def normazlied_flux_series_from_bad(frequency:float, accretion_series:AccretionSeries, bad:BinaryAlphaDisk, boosting=False, lensing=False):
     """Generate a normalized periodic flux timeseries at given frequency from a BinaryAlphaDisk object
 
     Parameters
@@ -476,16 +478,13 @@ def normazlied_flux_series_from_bad(frequency:float, accretion_series:AccretionS
     acc  = accretion_series
     chi1 = bad.primary_flux_ratio(frequency)
     chi2 = bad.secondary_flux_ratio(frequency)
-    mag1 = 1.0
-    mag2 = 1.0
-    if (lens_boost) & (bad.i != 0.0):
-        mag1 = bad.lensing_boosting_magnification(acc.time, fs=0)
-        mag2 = bad.lensing_boosting_magnification(acc.time, fs=1)
+    mag1 = bad.lensing_boosting_magnification(acc.time, fs=0, boosting=boosting, lensing=lensing) if bad.i!=0 else 1.0
+    mag2 = bad.lensing_boosting_magnification(acc.time, fs=1, boosting=boosting, lensing=lensing) if bad.i!=0 else 1.0
     disk_flux = 1.0 - chi1 - chi2
     mdot_mean = np.mean(acc.total)
     return chi1 * acc.primary / mdot_mean * mag1 + chi2 * acc.secondary / mdot_mean * mag2 + disk_flux
 
-def periodic_flux_series_from_bad(frequency:float, accretion_series:AccretionSeries, bad:BinaryAlphaDisk, lens_boost=False):
+def periodic_flux_series_from_bad(frequency:float, accretion_series:AccretionSeries, bad:BinaryAlphaDisk, boosting=False, lensing=False):
     """Generate a periodic flux timeseries at given frequency from a BinaryAlphaDisk object
 
     Parameters
@@ -504,7 +503,7 @@ def periodic_flux_series_from_bad(frequency:float, accretion_series:AccretionSer
     ------
     (ndarry) periodic flux timeseries with same shape as accretion_series.primary/secondary/total in cgs
     """
-    return bad.fnu_total(frequency) * normazlied_flux_series_from_bad(frequency, accretion_series, bad, lens_boost=lens_boost)
+    return bad.fnu_total(frequency) * normazlied_flux_series_from_bad(frequency, accretion_series, bad, boosting=boosting, lensing=lensing)
 
 # -----------------------------------------------------------------------------
 def magnitude_from_flux(specific_flux, zero_point_flux):
