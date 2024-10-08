@@ -84,8 +84,9 @@ class BinaryAlphaDisk:
                  argument_of_pericenter_deg:float=0.0,
                  spectral_slope_lnln:float=-1.0,
                  geometric_dimming:int=False,
+                 mass_ratio:float=1.0, # 0 < q < 1; be careful when using with acc. variability because changes iscos/inner boundary temps
                  ):
-        self.q = 1.0
+        self.q = mass_ratio
         self.p = period_yr * yr2sec
         self.m = total_mass_msun * Msun_cgs
         self.i = inclination_deg * (np.pi / 180.) # NOTE: consistent for boosting
@@ -157,7 +158,7 @@ class BinaryAlphaDisk:
         """
         return 1.0 - self.primary_flux_ratio(nu) - self.secondary_flux_ratio(nu)
 
-    def lensing_boosting_magnification(self, time, fs):
+    def lensing_boosting_magnification(self, time, fs, lensing=True, boosting=True):
         """calculate magnification factor from lensing+boosting effects
 
         time : array of times in units of orbits (typically from an AccretionSeries object)
@@ -167,7 +168,7 @@ class BinaryAlphaDisk:
         """
         n  = 2 * np.pi / self.p
         a  = (G_cgs * self.m / n**2)**(1./3.)
-        m1 = self.m / (1. + self.q)
+        m1 = self.m1
         m2 = self.q * m1
         a1 = a * m2 / self.m
         a2 = a * m1 / self.m
