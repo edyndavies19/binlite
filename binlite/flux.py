@@ -6,17 +6,6 @@ from .accretion import AccretionSeries, Qfit
 
 
 # ===================================================================
-def eccentric_anomaly(mean_anomaly, e=1.0):
-    """
-    Compute orbital eccentric anomaly from the mean anomaly by solving Kepler's equation 
-    """
-    m = mean_anomaly
-    f = lambda E: E - e * np.sin(E) - m
-    E = root_scalar(f, x0=m, x1=m + 0.1, method='secant').root
-    return E
-
-
-# ===================================================================
 class BinaryAlphaDisk:
     """Helper class for generating periodic flux curves from accretion onto equal-mass eccentric binaries
 
@@ -90,18 +79,23 @@ class BinaryAlphaDisk:
         self.p = period_yr * yr2sec
         self.m = total_mass_msun * Msun_cgs
         self.i = inclination_deg * (np.pi / 180.) # NOTE: consistent for boosting
-        self.a = self.__semi_major_axis(self.p, self.m)
+        self.a = semi_major_axis(self.p, self.m)
         self.ecc = eccentricity
-        self.mdot = eddington_ratio * self.__eddington_accretion_rate(self.m, accretion_efficiency)
+        self.mdot = eddington_ratio * eddington_accretion_rate(self.m, accretion_efficiency)
         self.qfac = Qfit(eccentricity)
         self.dlum = luminosity_distance_pc * pc2cm
-        self.m1  = self.m    / (1.0 + self.q)
+        self.m1  = self.m  / (1.0 + self.q)
+        self.m2  = self.m1 * self.q
         self.dm1 = self.mdot / (1.0 + self.qfac)
-        self.rin_md   = md_inner_edge_risco * self.__risco(self.m1)
-        self.rout_md  = self.__truncation_radius_md()
+        self.dm2 = self.qfac * self.dm1
+        self.rin_md1  = md_inner_edge_risco * risco(self.m1)
+        self.rin_md2  = md_inner_edge_risco * risco(self.m2)
+        self.rout_md1 = 0.27 * self.q**(-0.3) * self.a
+        self.rout_md2 = 0.27 * self.q**(+0.3) * self.a
         self.rin_cbd  = cbd_inner_edge_a * self.a
         self.rout_cbd = cbd_outer_edge_a * self.a
-        self.temp1 = self.__disk_temperature_r(self.m1, self.dm1, self.rin_md)
+        self.temp1 = disk_temperature_r(self.m1, self.dm1, self.rin_md1)
+        self.temp2 = disk_temperature_r(self.m2, self.dm2, self.rin_md2)
         self.vbary = barycenter_velocity_c * c_cgs
         self.pomega = argument_of_pericenter_deg * (np.pi / 180.)
         self.alphanu = spectral_slope_lnln
@@ -113,22 +107,22 @@ class BinaryAlphaDisk:
 
         nu : observing frequency in Hz
         """
-        return self.__fnu_disk(nu, self.temp1, self.rin_md, self.rin_md, self.rout_md, self.i, self.dlum)
+        return fnu_disk(nu, self.temp1, self.rin_md1, self.rin_md1, self.rout_md1, self.geometry, self.dlum)
 
     def fnu_secondary(self, nu):
         """specific flux from the secondary's minidisk at a given frequency
 
         nu : observing frequency in Hz
         """
-        return self.__fnu_disk(nu, self.qfac**(1./4.) * self.temp1, self.rin_md, self.rin_md, self.rout_md, self.i, self.dlum)
+        return fnu_disk(nu, self.temp2, self.rin_md2, self.rin_md2, self.rout_md2, self.geometry, self.dlum)
 
     def fnu_disk(self, nu):
         """specific flux from the outer-disk at a given frequency
 
         nu : observing frequency in Hz
         """
-        t_fac_cbd = 2.0**(1./4.) * (1.0 + self.qfac)**(1./4.)
-        return self.__fnu_disk(nu, t_fac_cbd * self.temp1, self.rin_md, self.rin_cbd, self.rout_cbd, self.i, self.dlum)
+        t_corr_cbd = (1 + self.q)**(1./4.) * (1.0 + self.qfac)**(1./4.)
+        return fnu_disk(nu, t_corr_cbd * self.temp1, self.rin_md1, self.rin_cbd, self.rout_cbd, self.geometry, self.dlum)
 
     def fnu_total(self, nu):
         """specific flux of the full system at a given frequency
@@ -169,7 +163,7 @@ class BinaryAlphaDisk:
         n  = 2 * np.pi / self.p
         a  = (G_cgs * self.m / n**2)**(1./3.)
         m1 = self.m1
-        m2 = self.q * m1
+        m2 = self.m2
         a1 = a * m2 / self.m
         a2 = a * m1 / self.m
         sini = np.sin(self.i)
@@ -216,37 +210,41 @@ class BinaryAlphaDisk:
         magnification[flip] = (1 - fs) * dop1[flip] * mlens[flip] + fs * dop2[flip]
         return magnification
 
-    # Internal methods
-    # -------------------------------------------------------------------------
-    def __eddington_luminosity(self, m):
-        LEddMsun = 4. * np.pi * G_cgs * Msun_cgs * mp_cgs * c_cgs / sigT_cgs
-        return LEddMsun * (m / Msun_cgs)
 
-    def __eddington_accretion_rate(self, m, eta):
-        return self.__eddington_luminosity(m) / (eta * c_cgs * c_cgs)  
+# Internal methods
+# -------------------------------------------------------------------------
+def eccentric_anomaly(mean_anomaly, e=1.0):
+    m = mean_anomaly
+    f = lambda E: E - e * np.sin(E) - m
+    E = root_scalar(f, x0=m, x1=m + 0.1, method='secant').root
+    return E
 
-    def __risco(self, m):
-        return 6.0 * G_cgs * m / c_cgs**2
+def eddington_luminosity(m):
+    LEddMsun = 4. * np.pi * G_cgs * Msun_cgs * mp_cgs * c_cgs / sigT_cgs
+    return LEddMsun * (m / Msun_cgs)
 
-    def __semi_major_axis(self, p, m):
-        return (p / (2. * np.pi))**(2./3.) * (G_cgs * m)**(1./3.)
+def eddington_accretion_rate(m, eta):
+    return eddington_luminosity(m) / (eta * c_cgs * c_cgs)  
 
-    def __truncation_radius_md(self):
-        return 0.27 * self.q**(0.3) * self.a
+def risco(m):
+    return 6.0 * G_cgs * m / c_cgs**2
 
-    def __disk_temperature_r(self, m, dm, r):
-        return (3. * G_cgs * m * dm / (8. * np.pi * r**3 * sigSB_cgs))**(1/4)
+def semi_major_axis(p, m):
+    return (p / (2. * np.pi))**(2./3.) * (G_cgs * m)**(1./3.)
 
-    def __bnu(self, nu, r, temp_in, r_in):
-        exarg = hp_cgs * nu / (kb_cgs * temp_in * (r/r_in)**(-3./4.))
-        return 2. * hp_cgs * nu**3 / c_cgs**2 / (np.exp(exarg) - 1.0)
+def disk_temperature_r(m, dm, r):
+    return (3. * G_cgs * m * dm / (8. * np.pi * r**3 * sigSB_cgs))**(1/4)
 
-    def __bnu_disk(self, r, nueval, temp_in, r_in):
-        return r * self.__bnu(nueval, r, temp_in, r_in)
+def bnu(nu, r, temp_in, r_in):
+    exarg = hp_cgs * nu / (kb_cgs * temp_in * (r/r_in)**(-3./4.))
+    return 2. * hp_cgs * nu**3 / c_cgs**2 / (np.exp(exarg) - 1.0)
 
-    def __fnu_disk(self, nu, tpr_min, rpr_min, r_in, r_out, inc, dst):
-        prefac = 2.0 * np.pi * self.geometry / dst**2
-        return prefac * quad(self.__bnu_disk, r_in, r_out, args=(nu, tpr_min, rpr_min))[0]
+def bnu_disk(r, nueval, temp_in, r_in):
+    return r * bnu(nueval, r, temp_in, r_in)
+
+def fnu_disk(nu, tpr_min, rpr_min, r_in, r_out, cosi, dst):
+    prefac = 2.0 * np.pi * cosi / dst**2
+    return prefac * quad(bnu_disk, r_in, r_out, args=(nu, tpr_min, rpr_min))[0]
 
 
 # User callable functions: public API
