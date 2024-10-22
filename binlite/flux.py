@@ -50,7 +50,7 @@ class BinaryAlphaDisk:
     --------------
     fnu_primary   : specific flux from the primary's minidisk at a given frequency
     fnu_secondary : specific flux from the secondary's minidisk at a given frequency
-    fnu_disk      : specific flux from the outer-disk at a given frequency
+    fnu_cbd       : specific flux from the outer-disk at a given frequency
     fnu_total     : specific flux of the full system at a given frequency
     primary_flux_ratio   : specific flux ratio of the primary's minidisk component to the total
     secondary_flux_ratio : specific flux ratio of the secondary's minidisk component to the total
@@ -94,8 +94,9 @@ class BinaryAlphaDisk:
         self.rout_md2 = 0.27 * self.q**(+0.3) * self.a
         self.rin_cbd  = cbd_inner_edge_a * self.a
         self.rout_cbd = cbd_outer_edge_a * self.a
-        self.temp1 = disk_temperature_r(self.m1, self.dm1, self.rin_md1)
-        self.temp2 = disk_temperature_r(self.m2, self.dm2, self.rin_md2)
+        self.temp1 = disk_temperature_r(self.m1, self.dm1 , self.rin_md1)
+        self.temp2 = disk_temperature_r(self.m2, self.dm2 , self.rin_md2)
+        self.temp3 = disk_temperature_r(self.m , self.mdot, self.rin_cbd)
         self.vbary = barycenter_velocity_c * c_cgs
         self.pomega = argument_of_pericenter_deg * (np.pi / 180.)
         self.alphanu = spectral_slope_lnln
@@ -107,29 +108,28 @@ class BinaryAlphaDisk:
 
         nu : observing frequency in Hz
         """
-        return fnu_disk(nu, self.temp1, self.rin_md1, self.rin_md1, self.rout_md1, self.geometry, self.dlum)
+        return fnu_disk(nu, self.temp1, self.rin_md1, self.rout_md1, self.geometry, self.dlum)
 
     def fnu_secondary(self, nu):
         """specific flux from the secondary's minidisk at a given frequency
 
         nu : observing frequency in Hz
         """
-        return fnu_disk(nu, self.temp2, self.rin_md2, self.rin_md2, self.rout_md2, self.geometry, self.dlum)
+        return fnu_disk(nu, self.temp2, self.rin_md2, self.rout_md2, self.geometry, self.dlum)
 
-    def fnu_disk(self, nu):
+    def fnu_cbd(self, nu):
         """specific flux from the outer-disk at a given frequency
 
         nu : observing frequency in Hz
         """
-        t_corr_cbd = (1 + self.q)**(1./4.) * (1.0 + self.qfac)**(1./4.)
-        return fnu_disk(nu, t_corr_cbd * self.temp1, self.rin_md1, self.rin_cbd, self.rout_cbd, self.geometry, self.dlum)
+        return fnu_disk(nu, self.temp3, self.rin_cbd, self.rout_cbd, self.geometry, self.dlum)
 
     def fnu_total(self, nu):
         """specific flux of the full system at a given frequency
 
         nu : observing frequency in Hz
         """
-        return self.fnu_primary(nu) + self.fnu_secondary(nu) + self.fnu_disk(nu)
+        return self.fnu_primary(nu) + self.fnu_secondary(nu) + self.fnu_cbd(nu)
 
     def primary_flux_ratio(self, nu):
         """specific flux ratio of the primary's minidisk component to the total
@@ -242,9 +242,9 @@ def bnu(nu, r, temp_in, r_in):
 def bnu_disk(r, nueval, temp_in, r_in):
     return r * bnu(nueval, r, temp_in, r_in)
 
-def fnu_disk(nu, tpr_min, rpr_min, r_in, r_out, cosi, dst):
+def fnu_disk(nu, temp_in, r_in, r_out, cosi, dst):
     prefac = 2.0 * np.pi * cosi / dst**2
-    return prefac * quad(bnu_disk, r_in, r_out, args=(nu, tpr_min, rpr_min))[0]
+    return prefac * quad(bnu_disk, r_in, r_out, args=(nu, temp_in, r_in))[0]
 
 
 # User callable functions: public API
