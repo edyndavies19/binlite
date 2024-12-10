@@ -8,11 +8,14 @@ retro_beat_p = 2
 
 
 # ===================================================================
-def Qfit(ecc):
+def Qfit(ecc, retro):
 	""" 
 	Fitting func for Q(e) from D'Orazio, Duffell, & Tiede 2024, Eq.4 
 	"""
-	return (1. - (2. - ecc**2 - 2. * ecc**3)*ecc) / (1. + (2. + ecc**2) * ecc)
+	if retro:
+		return 1.0
+	else:
+		return (1. - (2. - ecc**2 - 2. * ecc**3)*ecc) / (1. + (2. + ecc**2) * ecc)
 
 
 # Load files at startup/input to optimize series generation
