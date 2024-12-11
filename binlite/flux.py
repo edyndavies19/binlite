@@ -73,6 +73,7 @@ class BinaryAlphaDisk:
                  argument_of_pericenter_deg:float=0.0,
                  spectral_slope_lnln:float=-1.0,
                  geometric_dimming:int=False,
+                 retrograde:int=False,
                  mass_ratio:float=1.0, # 0 < q < 1; be careful when using with acc. variability because changes iscos/inner boundary temps
                  ):
         self.q = mass_ratio
@@ -81,8 +82,8 @@ class BinaryAlphaDisk:
         self.i = inclination_deg * (np.pi / 180.) # NOTE: consistent for boosting
         self.a = semi_major_axis(self.p, self.m)
         self.ecc = eccentricity
-        self.mdot = eddington_ratio * eddington_accretion_rate(self.m, accretion_efficiency)
-        self.qfac = Qfit(eccentricity, retrograde)
+        self.mdot = eddington_ratio * self.__eddington_accretion_rate(self.m, accretion_efficiency)
+        self.qfac = 1.0 if retrograde else Qfit(eccentricity)
         self.dlum = luminosity_distance_pc * pc2cm
         self.m1  = self.m  / (1.0 + self.q)
         self.m2  = self.m1 * self.q
@@ -284,6 +285,7 @@ def normalized_flux_series(frequency:float,
                            argument_of_pericenter_deg:float=0.0,
                            spectral_slope_lnln:float=-1.0,
                            geometric_dimming:int=False,
+                           retrograde:int=False,
                            boosting=False,
                            lensing=False,
                           ):
@@ -350,6 +352,7 @@ def normalized_flux_series(frequency:float,
                           argument_of_pericenter_deg,
                           spectral_slope_lnln,
                           geometric_dimming,
+                          acc.is_retro,
                         )
     return normalized_flux_series_from_bad(frequency, acc, bad, boosting=boosting, lensing=lensing)
 
@@ -368,6 +371,7 @@ def periodic_flux_series(frequency:float,
                          argument_of_pericenter_deg:float=0.0,
                          spectral_slope_lnln:float=-1.0,
                          geometric_dimming:int=False,
+                         retrograde:int=False,
                          boosting=False,
                          lensing=False,
                         ):
@@ -434,6 +438,7 @@ def periodic_flux_series(frequency:float,
                           argument_of_pericenter_deg,
                           spectral_slope_lnln,
                           geometric_dimming,
+                          acc.is_retro,
                         )
     return bad.fnu_total(frequency) * normalized_flux_series_from_bad(frequency, acc, bad, boosting=boosting, lensing=lensing)
 
@@ -506,7 +511,7 @@ def periodic_flux_series_from_bad(frequency:float, accretion_series:AccretionSer
 
 # -----------------------------------------------------------------------------
 def magnitude_from_flux(specific_flux, zero_point_flux):
-    """Apparent magnitude in an observing band given any specific flux F_\nu and the zero-point (normalizing) flux in that band
+    """Apparent magnitude in an observing band given any specific flux F_nu and the zero-point (normalizing) flux in that band
 
     Parameters
     ----------
@@ -538,7 +543,7 @@ if __name__ == '__main__':
         fig, [ax1, ax2] = plt.subplots(2, 1, sharex=True, figsize=[8, 6])
         plt.subplots_adjust(hspace=0.05)
         acc = AccretionSeries(x, n_modes=29, n_orbits=3, retrograde=False)
-        bad = BinaryAlphaDisk(x, p_yr, m_msun, dl_pc, eddington_ratio=fedd)
+        bad = BinaryAlphaDisk(x, p_yr, m_msun, dl_pc, eddington_ratio=fedd, retrograde=acc.is_retro)
         yrs = time_from_bad(acc, bad)
         flux = periodic_flux_series_from_bad(vband_nu, acc, bad)
         ax1.plot(yrs, flux, 'C0-')
