@@ -351,7 +351,7 @@ def normalized_flux_series(frequency:float,
                           spectral_slope_lnln,
                           geometric_dimming,
                         )
-    return normazlied_flux_series_from_bad(frequency, acc, bad, boosting=boosting, lensing=lensing)
+    return normalized_flux_series_from_bad(frequency, acc, bad, boosting=boosting, lensing=lensing)
 
 def periodic_flux_series(frequency:float, 
                          accretion_series:AccretionSeries, 
@@ -435,7 +435,7 @@ def periodic_flux_series(frequency:float,
                           spectral_slope_lnln,
                           geometric_dimming,
                         )
-    return bad.fnu_total(frequency) * normazlied_flux_series_from_bad(frequency, acc, bad, boosting=boosting, lensing=lensing)
+    return bad.fnu_total(frequency) * normalized_flux_series_from_bad(frequency, acc, bad, boosting=boosting, lensing=lensing)
 
 # -----------------------------------------------------------------------------
 def time_from_bad(accretion_series:AccretionSeries, bad:BinaryAlphaDisk):
@@ -455,7 +455,7 @@ def time_from_bad(accretion_series:AccretionSeries, bad:BinaryAlphaDisk):
     """
     return time(accretion_series, bad.p / yr2sec)
 
-def normazlied_flux_series_from_bad(frequency:float, accretion_series:AccretionSeries, bad:BinaryAlphaDisk, boosting=False, lensing=False):
+def normalized_flux_series_from_bad(frequency:float, accretion_series:AccretionSeries, bad:BinaryAlphaDisk, boosting=False, lensing=False):
     """Generate a normalized periodic flux timeseries at given frequency from a BinaryAlphaDisk object
 
     Parameters
@@ -502,7 +502,7 @@ def periodic_flux_series_from_bad(frequency:float, accretion_series:AccretionSer
     ------
     (ndarry) periodic flux timeseries with same shape as accretion_series.primary/secondary/total in cgs
     """
-    return bad.fnu_total(frequency) * normazlied_flux_series_from_bad(frequency, accretion_series, bad, boosting=boosting, lensing=lensing)
+    return bad.fnu_total(frequency) * normalized_flux_series_from_bad(frequency, accretion_series, bad, boosting=boosting, lensing=lensing)
 
 # -----------------------------------------------------------------------------
 def magnitude_from_flux(specific_flux, zero_point_flux):
