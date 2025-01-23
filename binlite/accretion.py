@@ -1,6 +1,7 @@
 import numpy as np
 import pkg_resources
-
+from scipy.interpolate import LinearNDInterpolator
+import csv
 
 # =============================================================================
 lump_period  = 5
@@ -8,14 +9,29 @@ retro_beat_p = 2
 
 
 # ===================================================================
-def Qfit(ecc, retro):
+def Qfit(ecc, retro, mass_ratio):
 	""" 
 	Fitting func for Q(e) from D'Orazio, Duffell, & Tiede 2024, Eq.4 
 	"""
 	if retro:
 		return 1.0
 	else:
-		return (1. - (2. - ecc**2 - 2. * ecc**3)*ecc) / (1. + (2. + ecc**2) * ecc)
+		e = []
+		q = []
+		lamda = []
+
+		with open('qevals.csv', mode ='r')as file:
+			csvFile = csv.reader(file)
+			for lines in csvFile:
+				e.append(float(lines[0]))
+				q.append(float(lines[1]))
+				lamda.append(float(lines[2]))
+
+		qe = np.zeros([len(q), 2])
+		qe[:,0] = q
+		qe[:,1] = e
+		p = LinearNDInterpolator(qe, lamda)
+		return p(mass_ratio, ecc)
 
 
 # Load files at startup/input to optimize series generation
