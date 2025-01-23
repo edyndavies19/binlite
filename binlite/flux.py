@@ -83,7 +83,7 @@ class BinaryAlphaDisk:
         self.a = semi_major_axis(self.p, self.m)
         self.ecc = eccentricity
         self.mdot = eddington_ratio * self.__eddington_accretion_rate(self.m, accretion_efficiency)
-        self.qfac = 1.0 if retrograde else Qfit(eccentricity)
+        self.qfac = 1.0 if retrograde else Qfit(eccentricity, retro, mass_ratio)
         self.dlum = luminosity_distance_pc * pc2cm
         self.m1  = self.m  / (1.0 + self.q)
         self.m2  = self.m1 * self.q
